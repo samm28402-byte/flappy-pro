@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Flappy Pro Final</title>
+<style>
+body{
+margin:0;
+font-family:Arial;
+background:linear-gradient(#e0f2fe,#ffffff);
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+}
+canvas{
+display:none;
+background:linear-gradient(#38bdf8,#e0f2fe);
+border-radius:16px;
+box-shadow:0 0 30px #000;
+}
+#menu,#shop,#levels,#gameOver{
+text-align:center;
+}
+h1{
+color:#0284c7;
+}
+button{
+padding:10px 25px;
+margin:6px;
+font-size:16px;
+border:none;
+border-radius:10px;
+cursor:pointer;
+background:#22c55e;
+color:black;
+}
+.shop-btn{background:#facc15;}
+.back{background:#ef4444;}
+.skin{
+width:40px;height:40px;border-radius:50%;
+display:inline-block;margin:5px;cursor:pointer;
+border:2px solid black;
+}
+.lock{opacity:.4;pointer-events:none;}
+</style>
+</head>
+<body>
+
+<div id="menu">
+<h1>🐤 FLAPPY PRO</h1>
+<p>Coins: <span id="coinText">0</span></p>
+<p>High Score: <span id="highText">0</span></p>
+<button onclick="startGame()">START</button><br>
+<button class="shop-btn" onclick="openLevels()">LEVELS</button>
+<button class="shop-btn" onclick="openShop()">SHOP</button>
+</div>
+
+<div id="levels" style="display:none">
+<h2>Select Level</h2>
+<div id="levelButtons"></div>
+<br>
+<button class="back" onclick="backMenu()">BACK</button>
+</div>
+
+<div id="shop" style="display:none">
+<h2>SHOP</h2>
+<p>Coins: <span id="shopCoins">0</span></p>
+<div id="skins"></div>
+<br>
+<button class="back" onclick="backMenu()">BACK</button>
+</div>
+
+<div id="gameOver" style="display:none">
+<h1>GAME OVER</h1>
+<p id="finalScore"></p>
+<button onclick="backMenu()">HOME</button>
+</div>
+
+<canvas id="game" width="400" height="600"></canvas>
+
+<script>
+const c=document.getElementById("game"),ctx=c.getContext("2d");
+const menu=document.getElementById("menu");
+const shop=document.getElementById("shop");
+const levels=document.getElementById("levels");
+const gameOverBox=document.getElementById("gameOver");
+
+let bird,pipes,frame,score,coins,level,speed,gameOver;
+
+let totalCoins=+localStorage.getItem("coins")||0;
+let high=+localStorage.getItem("high")||0;
+let unlocked=+localStorage.getItem("unlocked")||1;
+let skin=localStorage.getItem("skin")||"#fde047";
+
+const skins=[
+{c:"#fde047",p:0},
+{c:"#22c55e",p:10},
+{c:"#3b82f6",p:20},
+{c:"#ec4899",p:30},
+{c:"#a855f7",p:40}
+];
+
+updateHome();
+
+function updateHome(){
+coinText.innerText=totalCoins;
+highText.innerText=high;
+}
+
+function startGame(lv=1){
+menu.style.display=shop.style.display=levels.style.display=gameOverBox.style.display="none";
+c.style.display="block";
+reset(lv);
+requestAnimationFrame(loop);
+}
+
+function reset(lv){
+bird={x:90,y:300,vy:0,wing:0};
+pipes=[];
+frame=0;score=0;coins=0;
+level=lv;
+speed=lv<=5?2+lv*0.3:3+lv*0.6;
+gameOver=false;
+}
+
+function flap(){bird.vy=-7;bird.wing=1;}
+document.addEventListener("keydown",e=>{if(e.code==="Space")flap();});
+c.addEventListener("click",flap);
+
+function loop(){
+if(gameOver)return end();
+update();draw();
+requestAnimationFrame(loop);
+}
+
+function update(){
+frame++;
+bird.vy+=0.4;bird.y+=bird.vy;
+bird.wing=Math.max(0,bird.wing-0.1);
+
+if(frame%90===0){
+let gap=level<=5?170:130;
+let top=Math.random()*250+50;
+pipes.push({x:400,top,gap,pass:false});
+}
+
+pipes.forEach(p=>p.x-=speed);
+pipes=pipes.filter(p=>p.x>-60);
+
+pipes.forEach(p=>{
+if(bird.x>p.x+50&&!p.pass){
+p.pass=true;score++;coins++;totalCoins++;
+}
+if(bird.x<p.x+50&&bird.x+30>p.x&&(bird.y<p.top||bird.y+30>p.top+p.gap))
+gameOver=true;
+});
+if(bird.y>600||bird.y<0)gameOver=true;
+}
+
+function draw(){
+ctx.clearRect(0,0,400,600);
+ctx.fillStyle="#16a34a";
+pipes.forEach(p=>{
+ctx.fillRect(p.x,0,50,p.top);
+ctx.fillRect(p.x,p.top+p.gap,50,600);
+});
+
+// bird
+ctx.save();
+ctx.translate(bird.x,bird.y);
+ctx.fillStyle=skin;
+ctx.beginPath();ctx.arc(0,0,15,0,Math.PI*2);ctx.fill();
+ctx.restore();
+
+ctx.fillStyle="black";
+ctx.fillText("Score:"+score,10,20);
+ctx.fillText("Coins:"+coins,10,40);
+}
+
+function end(){
+c.style.display="none";
+gameOverBox.style.display="block";
+finalScore.innerText="Score: "+score;
+if(score>high){high=score;localStorage.setItem("high",high);}
+if(level===unlocked && unlocked<10){
+unlocked++;
+localStorage.setItem("unlocked",unlocked);
+}
+localStorage.setItem("coins",totalCoins);
+updateHome();
+}
+
+function openShop(){
+menu.style.display="none";shop.style.display="block";
+shopCoins.innerText=totalCoins;
+skinsBox();
+}
+function skinsBox(){
+skinsDiv=document.getElementById("skins");
+skinsDiv.innerHTML="";
+skins.forEach(s=>{
+let d=document.createElement("div");
+d.className="skin";
+d.style.background=s.c;
+d.onclick=()=>{
+if(s.p<=totalCoins){
+skin=s.c;
+localStorage.setItem("skin",s.c);
+if(s.p>0){totalCoins-=s.p;s.p=0;}
+localStorage.setItem("coins",totalCoins);
+shopCoins.innerText=totalCoins;
+}
+};
+skinsDiv.appendChild(d);
+});
+}
+
+function openLevels(){
+menu.style.display="none";levels.style.display="block";
+levelButtons.innerHTML="";
+for(let i=1;i<=10;i++){
+let b=document.createElement("button");
+b.innerText="Level "+i;
+if(i>unlocked)b.classList.add("lock");
+b.onclick=()=>startGame(i);
+levelButtons.appendChild(b);
+}
+}
+function backMenu(){
+menu.style.display="block";
+shop.style.display=levels.style.display=gameOverBox.style.display="none";
+updateHome();
+}
+</script>
+</body>
+</html>
